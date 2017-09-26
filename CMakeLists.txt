@@ -10,6 +10,7 @@ set(CMAKE_THREAD_LIBS_INIT "-lpthread")
 set(CMAKE_HAVE_THREADS_LIBRARY 1)
 set(CMAKE_USE_WIN32_THREADS_INIT 0)
 set(CMAKE_USE_PTHREADS_INIT 1)
+set(CMAKE_BUILD_TYPE "Debug")
 
 # If system has ccache - use it
 find_program(CCACHE_FOUND ccache)

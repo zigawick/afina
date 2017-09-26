@@ -52,6 +52,11 @@ public:
      * TODO: semantics
      */
     std::string dump() const;
+private:
+    size_t get_new_descriptor();
+    size_t *get_ptr(size_t offset);
+    size_t get_val(size_t offset);
+    std::pair<size_t, size_t> get_info(size_t offset);
 
 private:
     void *_base;

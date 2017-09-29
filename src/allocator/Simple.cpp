@@ -239,6 +239,26 @@ void Simple::free(Pointer &p) {
 /**
  * TODO: semantics
  */
+
+
+// returns is in pair, prev, next
+std::pair<bool,std::pair<size_t, size_t>> Simple::is_in_free (size_t offset)
+{
+  size_t neighbor = m_first_free_block;
+  size_t temp = get_val (neighbor);
+  while (temp != offset && temp != 0)
+    {
+      neighbor = temp;
+      temp = get_val (temp);
+    }
+  if (temp == 0)// hehe 0 is a valid for next free
+    {
+      return {false, {0,0}};
+    }
+
+  return {true, }
+}
+
 void Simple::defrag() {
 
 

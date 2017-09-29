@@ -7,6 +7,8 @@
 namespace Afina {
 namespace Allocator {
 
+  constexpr size_t size_t_size = sizeof (size_t);
+
 // Forward declaration. Do not include real class definition
 // to avoid expensive macros calculations and increase compile speed
 class Pointer;
@@ -53,14 +55,19 @@ public:
      */
     std::string dump() const;
 private:
-    size_t get_new_descriptor();
+    std::pair<size_t, bool> get_new_descriptor();
     size_t *get_ptr(size_t offset);
-    size_t get_val(size_t offset);
+    size_t get_val(size_t offset) const;
     std::pair<size_t, size_t> get_info(size_t offset);
 
 private:
     void *_base;
     const size_t _base_len;
+
+    size_t m_first_free_block = _base_len - 1 * size_t_size;
+    size_t m_descr_table_size = _base_len - 2 * size_t_size;
+    size_t m_first_free_descr = _base_len - 3 * size_t_size;
+    size_t m_free_space_count = _base_len - 4 * size_t_size;
 };
 
 } // namespace Allocator

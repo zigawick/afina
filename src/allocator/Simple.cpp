@@ -176,25 +176,40 @@ void Simple::free(Pointer &p) {
       size_t end_of_part = get_val (descr_info.first) + descr_info.second + 1;
       size_t neighbor = m_first_free_block;
       size_t temp = get_val (neighbor);
-      while (temp != end_of_part && temp != 0)
+      while (temp != descr_info.first && temp != end_of_part && temp != 0)
         {
           neighbor = temp;
           temp = get_val (temp);
         }
 
       // we're creating new free pice
-      if (temp != end_of_part)
-        {
-          *get_ptr (neighbor) = descr_info.first;
-          *get_ptr (descr_info.first) = temp; // pointer
-          *get_ptr (descr_info.first + size_t_size) = descr_info.second; // size
-        }
-      else // we're uniting two pices
+      if (temp == end_of_part)
         {
           *get_ptr (neighbor) = descr_info.first;
           *get_ptr (descr_info.first) = get_val (temp); // pointer
           *get_ptr (descr_info.first + size_t_size) //size
               = descr_info.second + get_val (temp + size_t_size);
+        }
+      else if (temp == descr_info.first) // we're uniting two pices free + this
+        {
+          if (get_val (temp) == end_of_part) // free + this + free
+            {
+              *get_ptr (neighbor) = get_val (temp);
+              *get_ptr (neighbor + 1 * size_t_size) = get_val (neighbor + 1 * size_t_size)
+                                                      + descr_info.second
+                                                      + get_val (temp + 1 * size_t_size);
+            }
+          else
+            {
+              *get_ptr (neighbor + 1 * size_t_size) = get_val (neighbor + 1 * size_t_size)
+                                                      + descr_info.second;
+            }
+        }
+      else // we're uniting two pices this + free
+        {
+          *get_ptr (neighbor) = descr_info.first;
+          *get_ptr (descr_info.first) = temp; // pointer
+          *get_ptr (descr_info.first + size_t_size) = descr_info.second; // size
         }
     }
 
@@ -225,6 +240,11 @@ void Simple::free(Pointer &p) {
  * TODO: semantics
  */
 void Simple::defrag() {
+
+
+
+
+
   std::cout<<"defrag\n";
 }
 

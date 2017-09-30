@@ -19,7 +19,10 @@ public:
     Pointer &operator=(const Pointer &rhs);
     Pointer &operator=(Pointer &&rhs);
 
-    void *get() const { return *(void **)(m_descr); }
+    void *get() const {
+      if (m_descr == nullptr)
+        return nullptr;
+      return *(void **)(m_descr); }
 
     void *m_descr;
 };

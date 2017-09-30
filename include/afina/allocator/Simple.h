@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstddef>
+#include <vector>
 
 namespace Afina {
 namespace Allocator {
@@ -53,7 +54,7 @@ public:
     /**
      * TODO: semantics
      */
-    std::string dump() const;
+    std::vector<size_t> dump() const;
 private:
     std::pair<size_t, bool> get_new_descriptor();
     size_t get_val(size_t offset) const;

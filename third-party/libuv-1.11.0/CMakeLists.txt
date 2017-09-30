@@ -51,7 +51,8 @@ else()
       src/unix/darwin-proctitle.c
       src/unix/fsevents.c
       src/unix/kqueue.c
-      src/unix/proctitle.c)
+      src/unix/proctitle.c
+      src/unix/pthread-barrier.c)
   elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     set(SOURCES ${SOURCES}
       src/unix/freebsd.c)

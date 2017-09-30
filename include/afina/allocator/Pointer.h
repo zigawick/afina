@@ -24,7 +24,7 @@ public:
         return nullptr;
       return *(void **)(m_descr); }
 
-    void *m_descr;
+    void *m_descr = nullptr;
 };
 
 } // namespace Allocator

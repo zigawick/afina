@@ -56,12 +56,12 @@ public:
     std::string dump() const;
 private:
     std::pair<size_t, bool> get_new_descriptor();
-    size_t *get_ptr(size_t offset);
     size_t get_val(size_t offset) const;
     std::pair<size_t, size_t> get_info(size_t offset);
     bool is_in_free(size_t offset);
     size_t find_descriptor_for_memory(size_t point);
     void move_by_byte(size_t descr, size_t point);
+    void put_val(size_t offset, size_t value);
 
 private:
     void *_base;

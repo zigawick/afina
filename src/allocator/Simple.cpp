@@ -21,9 +21,9 @@ std::pair<size_t, size_t> Simple::get_info (size_t offset)
   return ret;
 }
 
-size_t * Simple::get_ptr (size_t offset)
+void Simple::put_val (size_t offset, size_t value)
 {
-  return (size_t *) (_base + offset);
+    *static_cast<size_t *>(_base + offset) = value;
 }
 
 size_t Simple::get_val (size_t offset) const
@@ -38,20 +38,21 @@ std::pair<size_t, bool> Simple::get_new_descriptor ()
 
   if (free_descr == 0) // we have no free descriptors
     {
-      size_t *descr_size = get_ptr (m_descr_table_size );
+      size_t descr_size = get_val (m_descr_table_size);
       size_t free = get_val (m_free_space_count);
       if (free == 0)
         //check if we have enough free space for new descriptor
         {
           throw Allocator::AllocError (AllocErrorType::NoMemory, "not enough memory for new descriptor");
         }
-      *descr_size += 1;
-      *get_ptr (m_free_space_count) -= 2 * size_t_size;
-      return {_base_len - 2 * (*descr_size) * size_t_size - 4 * size_t_size, true};
+      descr_size += 1;
+      put_val (m_descr_table_size, descr_size);
+      put_val (m_free_space_count, get_val (m_free_space_count) - 2 * size_t_size);
+      return {_base_len - 2 * descr_size * size_t_size - 4 * size_t_size, true};
     }
   else
     {
-      *get_ptr (_base_len- 3 * size_t_size) = *get_ptr (free_descr);
+      put_val (_base_len- 3 * size_t_size, get_val (free_descr));
       return {free_descr, false};
     }
 }
@@ -63,12 +64,12 @@ Simple::Simple(void *base, size_t size) : _base(base), _base_len(size) {
   m_first_free_descr = _base_len - 3 * size_t_size;
   m_free_space_count = _base_len - 4 * size_t_size;
 
-  *get_ptr (0) = m_first_free_block;// offset to the next free block
-  *get_ptr (1 * size_t_size) = _base_len - 4 * size_t_size; // size of free block
-  *get_ptr (m_first_free_block) = 0; // offset to first free block
-  *get_ptr (m_descr_table_size ) = 0; // size of descriptors table
-  *get_ptr (m_first_free_descr) = 0; // offset to the first free descriptor
-  *get_ptr (m_free_space_count) = _base_len - 4 * size_t_size; // free space count
+  put_val (0, m_first_free_block);// offset to the next free block
+  put_val (1 * size_t_size,_base_len - 4 * size_t_size); // size of free block
+  put_val (m_first_free_block, 0); // offset to first free block
+  put_val (m_descr_table_size, 0); // size of descriptors table
+  put_val (m_first_free_descr, 0); // offset to the first free descriptor
+  put_val (m_free_space_count, _base_len - 4 * size_t_size); // free space count
 }
 
 /**
@@ -85,13 +86,13 @@ Pointer Simple::alloc(size_t N) {
 
 
   size_t prev_free_offset = _base_len - size_t_size;
-  size_t *free_offset = get_ptr (prev_free_offset);
+  size_t free_offset = get_val (prev_free_offset);
 
   std::pair<size_t, size_t> free_info;
   // looking for first large enough part
   do
     {
-      auto free_info = get_info (*free_offset);
+      auto free_info = get_info (free_offset);
       if (free_info.second >= N)
         {
           auto descr_offset = get_new_descriptor ();
@@ -106,35 +107,35 @@ Pointer Simple::alloc(size_t N) {
                                       - free_info.first;
                 }
             }
-          (*get_ptr(descr_offset.first)) = (size_t) (_base + *free_offset);
+          put_val (descr_offset.first, (size_t)(_base + free_offset));
           auto ret_ptr = Pointer (_base + descr_offset.first);
           size_t alloc_mem = 0;
 
           // can we leave free space in this sector?
           if (free_info.second - N >= 2 * size_t_size)
             {
-              *get_ptr (descr_offset.first + size_t_size) = N;
+              put_val (descr_offset.first + size_t_size, N);
 
-              *get_ptr (*free_offset + N) = free_info.first ;// new freespace offset
-              *get_ptr (*free_offset + N + size_t_size) = free_info.second - N;// new freespace size
-              *get_ptr (prev_free_offset) = *free_offset + N; // offset to new free space
+              put_val(free_offset + N, free_info.first);// new freespace offset
+              put_val (free_offset + N + size_t_size, free_info.second - N);// new freespace size
+              put_val (prev_free_offset, free_offset + N); // offset to new free space
               alloc_mem = N;
             }
           else // no we can't. So return whole sector
             {
-              *get_ptr (descr_offset.first + size_t_size) = free_info.second;
-              *free_offset = free_info.first; // offset to new free space
+              put_val (descr_offset.first + size_t_size, free_info.second);
+              put_val (free_offset, free_info.first); // offset to new free space
               alloc_mem = free_info.second;
             }
 
-          *get_ptr (m_free_space_count) -= alloc_mem;
+          put_val (m_free_space_count, get_val (m_free_space_count) - alloc_mem);
 //          std::cout << "alloc\n";
           dump ();
           return ret_ptr;
         }
 
       capacity += free_info.second;
-      free_offset = get_ptr (free_info.first);
+      free_offset = get_val (free_info.first);
     }while (free_info.first != 0);
 
   // looks like we have to do defragmentation
@@ -168,7 +169,7 @@ void Simple::free(Pointer &p) {
   auto descr_info = get_info (descr_offset);
 
   size_t prev_free_space = get_val (m_free_space_count);// store prev free space to do defrag maybe
-  *get_ptr (m_free_space_count) += descr_info.second;
+  put_val (m_free_space_count, get_val (m_free_space_count) + descr_info.second);
 
   // deal with free space
   if (descr_info.second != 0)
@@ -185,31 +186,31 @@ void Simple::free(Pointer &p) {
       // we're creating new free pice
       if (temp == end_of_part)
         {
-          *get_ptr (neighbor) = descr_info.first;
-          *get_ptr (descr_info.first) = get_val (temp); // pointer
-          *get_ptr (descr_info.first + size_t_size) //size
-              = descr_info.second + get_val (temp + size_t_size);
+          put_val (neighbor, descr_info.first);
+          put_val (descr_info.first, get_val (temp)); // pointer
+          put_val (descr_info.first + size_t_size, //size
+               descr_info.second + get_val (temp + size_t_size));
         }
       else if (temp == descr_info.first) // we're uniting two pices free + this
         {
           if (get_val (temp) == end_of_part) // free + this + free
             {
-              *get_ptr (neighbor) = get_val (temp);
-              *get_ptr (neighbor + 1 * size_t_size) = get_val (neighbor + 1 * size_t_size)
+              put_val (neighbor, get_val (temp));
+              put_val (neighbor + 1 * size_t_size, get_val (neighbor + 1 * size_t_size)
                                                       + descr_info.second
-                                                      + get_val (temp + 1 * size_t_size);
+                                                      + get_val (temp + 1 * size_t_size));
             }
           else
             {
-              *get_ptr (neighbor + 1 * size_t_size) = get_val (neighbor + 1 * size_t_size)
-                                                      + descr_info.second;
+              put_val (neighbor + 1 * size_t_size, get_val (neighbor + 1 * size_t_size)
+                                                      + descr_info.second);
             }
         }
       else // we're uniting two pices this + free
         {
-          *get_ptr (neighbor) = descr_info.first;
-          *get_ptr (descr_info.first) = temp; // pointer
-          *get_ptr (descr_info.first + size_t_size) = descr_info.second; // size
+          put_val (neighbor, descr_info.first);
+          put_val (descr_info.first, temp); // pointer
+          put_val (descr_info.first + size_t_size, descr_info.second); // size
         }
     }
 
@@ -223,8 +224,8 @@ void Simple::free(Pointer &p) {
       temp = get_val (temp);
     }
 
-  *get_ptr (last_free_descr_offset) = descr_offset;
-  *get_ptr (descr_offset) = 0;
+  put_val (last_free_descr_offset, descr_offset);
+  put_val (descr_offset, 0);
   p.m_descr = 0;
 
   if (prev_free_space == 0)
@@ -309,25 +310,25 @@ void Simple::defrag() {
       memcpy(_base + free_info.first, (void *)descr_info.first, descr_info.second);
   }
 
-  *get_ptr (descr) = (size_t) (_base + free_info.first);
+  put_val (descr, (size_t) (_base + free_info.first));
 
   size_t block_end = (size_t)((void *)descr_info.first - (size_t)_base) + descr_info.second;
   size_t new_block_end = free_info.first + descr_info.second;
 
-  *get_ptr (m_first_free_block) = new_block_end;
+  put_val (m_first_free_block, new_block_end);
 //  size_t next_block = _base_len;
   // update free sector
   if (free_info.first == block_end) // we have freee space after block
   {
       auto next_free = get_info(block_end);
-      *get_ptr (new_block_end) = next_free.first;
-      *get_ptr (new_block_end + size_t_size) = free_info.second + next_free.second;
+      put_val (new_block_end, next_free.first);
+      put_val (new_block_end + size_t_size, free_info.second + next_free.second);
 //      next_block = next_free.first + next_free.second;
   }
   else
   {
-      *get_ptr (new_block_end) = free_info.first;
-      *get_ptr (new_block_end + size_t_size) = free_info.second;
+      put_val (new_block_end, free_info.first);
+      put_val (new_block_end + size_t_size, free_info.second);
 //      next_block = new_block_end + free_info.second;
   }
     }

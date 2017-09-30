@@ -63,7 +63,7 @@ Simple::Simple(void *base, size_t size) : _base(base), _base_len(size) {
   m_first_free_descr = _base_len - 3 * size_t_size;
   m_free_space_count = _base_len - 4 * size_t_size;
 
-  *get_ptr (0) = 0;// offset to the next free block
+  *get_ptr (0) = m_first_free_block;// offset to the next free block
   *get_ptr (1 * size_t_size) = _base_len - 4 * size_t_size; // size of free block
   *get_ptr (m_first_free_block) = 0; // offset to first free block
   *get_ptr (m_descr_table_size ) = 0; // size of descriptors table
@@ -242,26 +242,95 @@ void Simple::free(Pointer &p) {
 
 
 // returns is in pair, prev, next
-std::pair<bool,std::pair<size_t, size_t>> Simple::is_in_free (size_t offset)
+bool Simple::is_in_free (size_t offset)
 {
   size_t neighbor = m_first_free_block;
   size_t temp = get_val (neighbor);
-  while (temp != offset && temp != 0)
+  while (temp != offset && temp != m_first_free_block)
     {
       neighbor = temp;
       temp = get_val (temp);
     }
-  if (temp == 0)// hehe 0 is a valid for next free
+  if (temp == m_first_free_block)
     {
-      return {false, {0,0}};
+      return false;
     }
 
-  return {true, }
+  return true;
+}
+
+
+size_t Simple::find_descriptor_for_memory (size_t point)
+{
+    size_t first_descr = _base_len - get_val (m_descr_table_size) * 2 - 4 * size_t_size;
+    size_t last_descr = _base_len - 4 * size_t_size;
+    void *pointer = _base + point;
+
+    for (size_t it = first_descr; it < last_descr; it += 2 * size_t_size)
+    {
+        if (pointer == (void *)get_val(it))
+            return it;
+    }
+
+    throw  AllocError (AllocErrorType::InternalError, "");
+}
+
+void Simple::move_by_byte (size_t descr, size_t point )
+{
+    auto info = get_info(descr);
+
+    for (size_t i = 0; info.second > i; i++)
+    {
+        memcpy((void *)_base + point + i, (void *)info.first + i, 1);
+    }
+
 }
 
 void Simple::defrag() {
+    size_t free_offset = m_first_free_block;
+    while (free_offset != m_first_free_block)
+    {
 
 
+  auto free_info = get_info (free_offset);
+
+  size_t point = free_info.first;
+
+  size_t descr = find_descriptor_for_memory (point);
+  auto descr_info = get_info (descr);
+
+
+  if (descr_info.second > free_info.second)// moving byte by byte
+  {
+      move_by_byte (descr, point);
+  }
+  else
+  {
+      memcpy(_base + free_info.first, (void *)descr_info.first, descr_info.second);
+  }
+
+  *get_ptr (descr) = (size_t) (_base + free_info.first);
+
+  size_t block_end = (size_t)((void *)descr_info.first - (size_t)_base) + descr_info.second;
+  size_t new_block_end = free_info.first + descr_info.second;
+
+  *get_ptr (m_first_free_block) = new_block_end;
+//  size_t next_block = _base_len;
+  // update free sector
+  if (free_info.first == block_end) // we have freee space after block
+  {
+      auto next_free = get_info(block_end);
+      *get_ptr (new_block_end) = next_free.first;
+      *get_ptr (new_block_end + size_t_size) = free_info.second + next_free.second;
+//      next_block = next_free.first + next_free.second;
+  }
+  else
+  {
+      *get_ptr (new_block_end) = free_info.first;
+      *get_ptr (new_block_end + size_t_size) = free_info.second;
+//      next_block = new_block_end + free_info.second;
+  }
+    }
 
 
 

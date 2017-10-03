@@ -2,8 +2,10 @@
 #define AFINA_STORAGE_MAP_BASED_GLOBAL_LOCK_IMPL_H
 
 #include <map>
+#include <list>
 #include <mutex>
 #include <string>
+#include <iterator>
 
 #include <afina/Storage.h>
 
@@ -36,11 +38,14 @@ public:
     bool Get(const std::string &key, std::string &value) const override;
 
 private:
+    bool update_usage(std::map<std::string, std::string>::iterator it);
+
     std::mutex _lock;
 
     size_t _max_size;
 
     std::map<std::string, std::string> _backend;
+    std::list<std::map<std::string, std::string>::iterator> _cache;
 };
 
 } // namespace Backend

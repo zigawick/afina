@@ -9,18 +9,20 @@ namespace Backend {
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::Put (const std::string &key, const std::string &value) {
+  {
     std::unique_lock<std::mutex> guard(_lock);
-  auto old_it = _backend.find (key);
+    auto old_it = _backend.find (key);
 
-  if (old_it != _backend.end ())
-    {
-      auto list_it = std::find (_cache.begin (), _cache.end (), old_it);
-      if (list_it == _cache.end ())
-        return false; // something strange
+    if (old_it != _backend.end ())
+      {
+        auto list_it = std::find (_cache.begin (), _cache.end (), old_it);
+        if (list_it == _cache.end ())
+          return false; // something strange
 
-      _cache.erase (list_it);
-      _backend.erase (old_it);
-    }
+        _cache.erase (list_it);
+        _backend.erase (old_it);
+      }
+  }
 
   return PutIfAbsent (key, value);
 }

@@ -4,6 +4,9 @@
 #include <uv.h>
 
 #include <cxxopts.hpp>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fstream>
 
 #include <afina/Storage.h>
 #include <afina/Version.h>
@@ -48,6 +51,8 @@ int main(int argc, char **argv) {
         // and simplify validation below
         options.add_options()("s,storage", "Type of storage service to use", cxxopts::value<std::string>());
         options.add_options()("n,network", "Type of network service to use", cxxopts::value<std::string>());
+        options.add_options()("p,pid", "Print PID to file specified by filename", cxxopts::value<std::string>());
+        options.add_options()("d,daemon", "Run application as daemon");
         options.add_options()("h,help", "Print usage info");
         options.parse(argc, argv);
 
@@ -63,6 +68,7 @@ int main(int argc, char **argv) {
     // Start boot sequence
     Application app;
     std::cout << "Starting " << app_string.str() << std::endl;
+
 
     // Build new storage instance
     std::string storage_type = "map_global";
@@ -89,6 +95,49 @@ int main(int argc, char **argv) {
     } else {
         throw std::runtime_error("Unknown network type");
     }
+
+
+    // Run daemon
+    if (options.count("daemon") > 0)
+      {
+        std::cout << "Disowning process.\n";
+        auto f_ret = fork ();
+        if (f_ret > 0)
+          return 0;
+        else if (f_ret < 0)
+          {
+            std::cout<< "Something went wrong. Can't start as daemon. Exiting.\n";
+            return 0;
+          }
+        // here can be only child process
+        if (::setsid () < 0)
+          {
+            std::cout<< "Something went wrong. Can't start as daemon. Exiting.\n";
+            return 0;
+          }
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+      }
+
+    // Print PID
+    do
+    {
+      std::string pid_filename;
+      if (options.count("pid") > 0) {
+          pid_filename = options["pid"].as<std::string>();
+        }
+      std::ofstream pid_file;
+      pid_file.open (pid_filename);
+      if (!pid_file.is_open ())
+        {
+          std::cout << "Can't open file \"" << pid_filename <<"\". Skipping -p flag.\n";
+          break;
+        }
+      pid_file << ::getpid () <<"\n";
+      pid_file.close();
+    } while (0);
+
 
     // Init local loop. It will react to signals and performs some metrics collections. Each
     // subsystem is able to push metrics actively, but some metrics could be collected only

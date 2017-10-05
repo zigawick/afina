@@ -1,14 +1,14 @@
 #ifndef AFINA_ALLOCATOR_SIMPLE_H
 #define AFINA_ALLOCATOR_SIMPLE_H
 
-#include <string>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace Afina {
 namespace Allocator {
 
-  constexpr size_t size_t_size = sizeof (size_t);
+constexpr size_t size_t_size = sizeof(size_t);
 
 // Forward declaration. Do not include real class definition
 // to avoid expensive macros calculations and increase compile speed
@@ -51,21 +51,17 @@ public:
      */
     void defrag();
 
-    /**
-     * TODO: semantics
-     */
-    std::vector<size_t> dump() const;
-    void get_prev_next_free(size_t end_of_part, size_t &prev_free_piece, std::pair<size_t, size_t> descr_info, size_t &next_free_piece);
-
-    void unit_free_picies(size_t end_of_part, size_t prev_free_piece, std::pair<size_t, size_t> descr_info, size_t next_free_piece, bool from_realloc = false);
-
 private:
+    void get_prev_next_free(size_t end_of_part, size_t &prev_free_piece, std::pair<size_t, size_t> descr_info,
+                            size_t &next_free_piece);
+
+    void unit_free_picies(size_t end_of_part, size_t prev_free_piece, std::pair<size_t, size_t> descr_info,
+                          size_t next_free_piece, bool from_realloc = false);
     std::pair<size_t, bool> get_new_descriptor();
     size_t get_val(size_t offset) const;
     std::pair<size_t, size_t> get_info(size_t offset);
     bool is_in_free(size_t offset);
     size_t find_descriptor_for_memory(size_t point);
-//    void move_by_byte(size_t descr, size_t point);
     void put_val(size_t offset, size_t value);
 
 private:

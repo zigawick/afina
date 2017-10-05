@@ -1,11 +1,11 @@
 #ifndef AFINA_STORAGE_MAP_BASED_GLOBAL_LOCK_IMPL_H
 #define AFINA_STORAGE_MAP_BASED_GLOBAL_LOCK_IMPL_H
 
-#include <map>
+#include <iterator>
 #include <list>
+#include <map>
 #include <mutex>
 #include <string>
-#include <iterator>
 
 #include <afina/Storage.h>
 

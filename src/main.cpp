@@ -127,6 +127,10 @@ int main(int argc, char **argv) {
       if (options.count("pid") > 0) {
           pid_filename = options["pid"].as<std::string>();
         }
+      else {
+          break;
+        }
+        
       std::ofstream pid_file;
       pid_file.open (pid_filename);
       if (!pid_file.is_open ())

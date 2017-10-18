@@ -113,6 +113,8 @@ void ServerImpl::Stop() {
 void ServerImpl::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     pthread_join(accept_thread, 0);
+    for (const auto &p : connections)
+      pthread_join (p, 0);
 }
 
 // See Server.h

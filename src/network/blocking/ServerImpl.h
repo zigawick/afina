@@ -2,14 +2,23 @@
 #define AFINA_NETWORK_BLOCKING_SERVER_H
 
 #include <atomic>
-#include <vector>
 #include <pthread.h>
+#include <vector>
+#include <deque>
 
 #include <afina/network/Server.h>
 
 namespace Afina {
 namespace Network {
 namespace Blocking {
+class ServerImpl;
+
+struct WorkerStruct {
+    WorkerStruct(ServerImpl *p, int s, int o) : parrent(p), listen_socket(s), offset(o) {}
+    ServerImpl *parrent = nullptr;
+    int listen_socket = -1;
+    int offset = -1;
+};
 
 /**
  * # Network resource manager implementation
@@ -38,10 +47,11 @@ protected:
     /**
      * Methos is running for each connection
      */
-    void RunConnection();
+    void RunConnection(int sock, int offset);
 
 private:
     static void *RunAcceptorProxy(void *p);
+    static void *RunConnectionProxy(void *p);
 
     // Atomic flag to notify threads when it is time to stop. Note that
     // flag must be atomic in order to safely publisj changes cross thread
@@ -64,6 +74,12 @@ private:
     // Threads that are processing connection data, permits
     // access only from inside of accept_thread
     std::vector<pthread_t> connections;
+
+    // client_socket for every connection, permits
+    // access only from inside of accept_thread
+    std::vector<WorkerStruct> connection_sockets;
+
+    std::deque<std::atomic_bool> finished;
 };
 
 } // namespace Blocking

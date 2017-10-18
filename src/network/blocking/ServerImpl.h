@@ -80,6 +80,7 @@ private:
     std::vector<WorkerStruct> connection_sockets;
 
     std::deque<std::atomic_bool> finished;
+    int accept_socket = -1;
 };
 
 } // namespace Blocking

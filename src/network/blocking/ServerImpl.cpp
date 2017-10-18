@@ -113,8 +113,11 @@ void ServerImpl::Stop() {
 void ServerImpl::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     pthread_join(accept_thread, 0);
-    for (const auto &p : connections)
-      pthread_join (p, 0);
+    for (int i = 0; i < connections.size(); i++)
+    {
+        if (finished[i].load())
+            pthread_join (connections[i], 0);
+    }
 }
 
 // See Server.h
@@ -190,6 +193,22 @@ void ServerImpl::RunAcceptor() {
 
         // When an incoming connection arrives, accept it. The call to accept() blocks until
         // the incoming connection arrives
+
+
+        int iResult;
+           struct timeval tv;
+           fd_set rfds;
+           FD_ZERO(&rfds);
+           FD_SET(server_socket, &rfds);
+
+           tv.tv_sec = 5;
+           tv.tv_usec = 0;
+
+           iResult = select(server_socket, &rfds, (fd_set *) 0, (fd_set *) 0, &tv);
+           if(iResult <= 0)
+           {
+              break;
+           }
         if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sinSize)) == -1) {
             close(server_socket);
             throw std::runtime_error("Socket accept() failed");

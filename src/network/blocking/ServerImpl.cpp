@@ -13,16 +13,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include <afina/execute/Command.h>
-#include <algorithm>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <protocol/Parser.h>
 #include <unistd.h>
 
 #include <afina/Storage.h>
-
-#define buf_len 1234
 
 namespace Afina {
 namespace Network {
@@ -34,17 +29,6 @@ void *ServerImpl::RunAcceptorProxy(void *p) {
         srv->RunAcceptor();
     } catch (std::runtime_error &ex) {
         std::cerr << "Server fails: " << ex.what() << std::endl;
-    }
-    return 0;
-}
-
-void *ServerImpl::RunConnectionProxy(void *p) {
-    WorkerStruct *strct = reinterpret_cast<WorkerStruct *>(p);
-
-    try {
-        strct->parrent->RunConnection(strct->listen_socket, strct->offset);
-    } catch (std::runtime_error &ex) {
-        std::cerr << "Worker fails: " << ex.what() << std::endl;
     }
     return 0;
 }
@@ -107,21 +91,12 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 void ServerImpl::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     running.store(false);
-    close (accept_socket);
-
 }
 
 // See Server.h
 void ServerImpl::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     pthread_join(accept_thread, 0);
-    for (const auto &i : connections)
-        pthread_join (i, 0);
-//    for (int i = 0; i < connections.size(); i++)
-//    {
-//        if (finished[i].load())
-//            pthread_join (connections[i], 0);
-//    }
 }
 
 // See Server.h
@@ -182,122 +157,69 @@ void ServerImpl::RunAcceptor() {
         throw std::runtime_error("Socket listen() failed");
     }
 
-    accept_socket = server_socket;
-
     int client_socket;
     struct sockaddr_in client_addr;
     socklen_t sinSize = sizeof(struct sockaddr_in);
-
-    for (int i = 0; i < max_workers; i++) {
-        finished.emplace_back(true);
-    }
-    connection_sockets.reserve(max_workers);
-    connections.resize(max_workers);
-
     while (running.load()) {
         std::cout << "network debug: waiting for connection..." << std::endl;
 
         // When an incoming connection arrives, accept it. The call to accept() blocks until
         // the incoming connection arrives
-
         if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sinSize)) == -1) {
             close(server_socket);
-            return;
-//            throw std::runtime_error("Socket accept() failed");
+            throw std::runtime_error("Socket accept() failed");
         }
 
+        // TODO: Start new thread and process data from/to connection
         {
-            auto first_free = std::find_if(finished.begin(), finished.end(),
-                                           [](const std::atomic_bool &elem) { return elem.load(); });
-            if (first_free == finished.end()) {
-                std::string msg = "Sorry all workers are busy\n";
-                if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-                    close(client_socket);
-                    close(server_socket);
-                    throw std::runtime_error("Socket send(1) failed");
-                }
+            std::string msg = "TODO: start new thread and process memcached protocol instead";
+            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
                 close(client_socket);
-            } else {
-                int free_offset = first_free - finished.begin();
-                connection_sockets[free_offset] = WorkerStruct(this, client_socket, free_offset);
-                finished[free_offset].store(false);
-                if (pthread_create(&connections[free_offset], NULL, ServerImpl::RunConnectionProxy,
-                                   &connection_sockets[free_offset]) < 0) {
-                    throw std::runtime_error("Could not create worker thread");
-                }
+                close(server_socket);
+                throw std::runtime_error("Socket send() failed");
             }
+            close(client_socket);
         }
     }
 
     // Cleanup on exit...
     close(server_socket);
+
+    // Wait until for all connections to be complete
+    std::unique_lock<std::mutex> __lock(connections_mutex);
+    while (!connections.empty()) {
+        connections_cv.wait(__lock);
+    }
 }
 
 // See Server.h
-void ServerImpl::RunConnection(int sock, int offset) {
+void ServerImpl::RunConnection() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+    pthread_t self = pthread_self();
 
-    char rcv_buf[buf_len];
-    std::string buf;
-
-    Protocol::Parser pr;
-    while (running.load()) {
-        sleep (7);
-        size_t parsed = 0;
-        pr.Reset();
-        bool was_parsed = false;
-        while (!was_parsed) {
-
-            int res = recv(sock, rcv_buf, buf_len, 0);
-            if (res < 0) {
-                close(sock);
-                finished[offset].store(true);
-                return;
-            }
-            if (res == 0) {
-                close(sock);
-                finished[offset].store(true);
-                return;
-            }
-            buf += std::string(rcv_buf, res);
-            was_parsed = pr.Parse(buf, parsed);
-            buf = buf.substr(parsed, buf.size() - parsed);
-        }
-
-        uint32_t body_size = 0;
-        std::unique_ptr<Execute::Command> command = pr.Build(body_size);
-
-        while (buf.size() < body_size) {
-            int res = recv(sock, rcv_buf, buf_len, 0);
-            if (res < 0) {
-                close(sock);
-                finished[offset].store(true);
-                return;
-            }
-            buf += std::string(rcv_buf, res);
-        }
-
-        std::string out;
-        try {
-            command->Execute(*pStorage, buf.substr(0, body_size), out);
-            if (send(sock, out.data(), out.size(), 0) <= 0) {
-                close(sock);
-                finished[offset].store(true);
-                return;
-            }
-        } catch (std::runtime_error &ex) {
-            std::string error = std::string("SERVER_ERROR ") + ex.what() + "\n";
-            if (send(sock, error.data(), error.size(), 0) <= 0) {
-                close(sock);
-                finished[offset].store(true);
-                return;
-            }
-        }
-
-        buf = buf.substr(body_size, buf.size() - body_size);
+    // Thread just spawn, register itself as a connection
+    {
+        std::unique_lock<std::mutex> __lock(connections_mutex);
+        connections.insert(self);
     }
-    close(sock);
-    finished[offset].store(true);
+
+    // TODO: All connection work is here
+
+    // Thread is about to stop, remove self from list of connections
+    // and it was the very last one, notify main thread
+    {
+        std::unique_lock<std::mutex> __lock(connections_mutex);
+        auto pos = connections.find(self);
+
+        assert(pos != connections.end());
+        connections.erase(pos);
+
+        if (connections.empty()) {
+            // We are pretty sure that only ONE thread is waiting for connections
+            // queue to be empty - main thread
+            connections_cv.notify_one();
+        }
+    }
 }
 
 } // namespace Blocking

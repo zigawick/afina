@@ -2,23 +2,16 @@
 #define AFINA_NETWORK_BLOCKING_SERVER_H
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <pthread.h>
-#include <vector>
-#include <deque>
+#include <unordered_set>
 
 #include <afina/network/Server.h>
 
 namespace Afina {
 namespace Network {
 namespace Blocking {
-class ServerImpl;
-
-struct WorkerStruct {
-    WorkerStruct(ServerImpl *p, int s, int o) : parrent(p), listen_socket(s), offset(o) {}
-    ServerImpl *parrent = nullptr;
-    int listen_socket = -1;
-    int offset = -1;
-};
 
 /**
  * # Network resource manager implementation
@@ -47,11 +40,10 @@ protected:
     /**
      * Methos is running for each connection
      */
-    void RunConnection(int sock, int offset);
+    void RunConnection();
 
 private:
     static void *RunAcceptorProxy(void *p);
-    static void *RunConnectionProxy(void *p);
 
     // Atomic flag to notify threads when it is time to stop. Note that
     // flag must be atomic in order to safely publisj changes cross thread
@@ -71,16 +63,16 @@ private:
     // Read-only
     uint32_t listen_port;
 
+    // Mutex used to access connections list
+    std::mutex connections_mutex;
+
+    // Conditional variable used to notify waiters about empty
+    // connections list
+    std::condition_variable connections_cv;
+
     // Threads that are processing connection data, permits
     // access only from inside of accept_thread
-    std::vector<pthread_t> connections;
-
-    // client_socket for every connection, permits
-    // access only from inside of accept_thread
-    std::vector<WorkerStruct> connection_sockets;
-
-    std::deque<std::atomic_bool> finished;
-    int accept_socket = -1;
+    std::unordered_set<pthread_t> connections;
 };
 
 } // namespace Blocking

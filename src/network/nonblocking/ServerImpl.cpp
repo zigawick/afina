@@ -15,6 +15,20 @@
 #include <unistd.h>
 
 #include <afina/Storage.h>
+#include <pthread.h>
+#include <signal.h>
+
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <arpa/inet.h>
+#include <execute/Command.cpp>
+#include <netinet/in.h>
+#include <protocol/Parser.h>
+#include <unistd.h>
+
+#include <afina/Storage.h>
 
 #include "Utils.h"
 #include "Worker.h"
@@ -30,8 +44,9 @@ ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : Server(ps) {}
 ServerImpl::~ServerImpl() {}
 
 // See Server.h
-void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
-    std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+void ServerImpl::Start(uint32_t port, uint16_t n_workers)
+{
+//    std::cout « "network debug: " « PRETTY_FUNCTION « std::endl;
 
     // If a client closes a connection, this will generally produce a SIGPIPE
     // signal that will kill the process. We want to ignore this signal, so send()
@@ -56,7 +71,8 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
     }
 
     int opts = 1;
-    if (setsockopt(server_socket, SOL_SOCKET, 0, &opts, sizeof(opts)) == -1) {
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opts, sizeof(opts)) == -1) {
+//        std::cout « errno « std::endl;
         close(server_socket);
         throw std::runtime_error("Socket setsockopt() failed");
     }
@@ -77,6 +93,7 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
         workers.back().Start(server_socket);
     }
 }
+
 
 // See Server.h
 void ServerImpl::Stop() {

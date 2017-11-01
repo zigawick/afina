@@ -3,6 +3,10 @@
 
 #include <memory>
 #include <pthread.h>
+#include <atomic>
+#include <map>
+#include <string>
+
 
 namespace Afina {
 
@@ -43,14 +47,26 @@ public:
      */
     void Join();
 
+    static void *RunProxy (void *p);
+
+    std::string ApplyFunc(std::string buf_in, int sock);
+
 protected:
     /**
      * Method executing by background thread
      */
-    void OnRun(void *args);
+    void OnRun(int sfd);
 
 private:
     pthread_t thread;
+
+    bool running = true;
+//    std::atomic<bool> __running;
+
+    std::shared_ptr<Afina::Storage> storage;
+    int m_server_socket;
+
+    std::map <int, std::string> bufers;
 };
 
 } // namespace NonBlocking

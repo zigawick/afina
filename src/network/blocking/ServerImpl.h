@@ -79,6 +79,8 @@ private:
 
     std::mutex sockets_mutex;
     std::map <pthread_t, int> sockets;
+
+    int server_socket;
 };
 
 } // namespace Blocking

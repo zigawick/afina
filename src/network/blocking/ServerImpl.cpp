@@ -104,12 +104,17 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 // See Server.h
 void ServerImpl::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+
+    close (server_socket);
+    std::cout << "Server socket:" << server_socket<< " closed\n";
     running.store(false);
 }
 
 // See Server.h
 void ServerImpl::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+    close (server_socket);
+
     pthread_join(accept_thread, 0);
 }
 
@@ -137,7 +142,7 @@ void ServerImpl::RunAcceptor() {
     // - Family: IPv4
     // - Type: Full-duplex stream (reliable)
     // - Protocol: TCP
-    int server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server_socket == -1) {
         throw std::runtime_error("Failed to open socket");
     }
@@ -179,10 +184,13 @@ void ServerImpl::RunAcceptor() {
 
         // When an incoming connection arrives, accept it. The call to accept() blocks until
         // the incoming connection arrives
+        std::cout << "Listen " << server_socket << "\n";
         if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &sinSize)) == -1) {
+            std::cout<< "Accept failed";
             close(server_socket);
             throw std::runtime_error("Socket accept() failed");
         }
+        std::cout<< "here";
 
         {
             std::unique_lock<std::mutex> __lock(connections_mutex);

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <pthread.h>
 #include <unordered_set>
+#include <map>
 
 #include <afina/network/Server.h>
 
@@ -44,6 +45,8 @@ protected:
 
 private:
     static void *RunAcceptorProxy(void *p);
+    static void *RunRunnerProxy(void *p);
+    void ApplyFunc(int sock);
 
     // Atomic flag to notify threads when it is time to stop. Note that
     // flag must be atomic in order to safely publisj changes cross thread
@@ -73,6 +76,9 @@ private:
     // Threads that are processing connection data, permits
     // access only from inside of accept_thread
     std::unordered_set<pthread_t> connections;
+
+    std::mutex sockets_mutex;
+    std::map <pthread_t, int> sockets;
 };
 
 } // namespace Blocking

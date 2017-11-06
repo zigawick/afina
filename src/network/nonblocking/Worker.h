@@ -7,6 +7,8 @@
 #include <map>
 #include <string>
 
+#include <netinet/in.h>
+
 
 namespace Afina {
 
@@ -31,7 +33,8 @@ public:
      * socket. Once connection accepted it must be registered and being processed
      * on this thread
      */
-    void Start(int server_socket);
+    void Start(sockaddr_in &server_addr);
+
 
     /**
      * Signal background thread to stop. After that signal thread must stop to

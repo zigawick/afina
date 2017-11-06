@@ -42,37 +42,59 @@ void *Worker::RunProxy(void *p) {
 
 // See Worker.h
 Worker::Worker(std::shared_ptr<Afina::Storage> ps) : storage(ps) {
-    // TODO: implementation here
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
 }
 
 // See Worker.h
-Worker::~Worker() {
-    // TODO: implementation here
-}
+Worker::~Worker() {}
 
 // See Worker.h
-void Worker::Start(int server_socket) {
+void Worker::Start(sockaddr_in &server_addr) {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     running = true;
-    m_server_socket = server_socket;
+    m_server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (m_server_socket == -1) {
+        throw std::runtime_error("Failed to open socket");
+    }
+
+    int opts = 1;
+    if (setsockopt(m_server_socket, SOL_SOCKET, SO_REUSEADDR, &opts, sizeof(opts)) == -1) {
+        close(m_server_socket);
+        throw std::runtime_error("Socket setsockopt() failed");
+    }
+#ifdef SO_REUSEPORT
+    if (setsockopt(m_server_socket, SOL_SOCKET, SO_REUSEPORT, &opts, sizeof(opts)) == -1) {
+        close(m_server_socket);
+        throw std::runtime_error("Socket setsockopt() failed");
+    }
+#endif
+
+    if (bind(m_server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        std::cout << errno;
+        close(m_server_socket);
+        throw std::runtime_error("Socket bind() failed");
+    }
+
+    make_socket_non_blocking(m_server_socket);
+    if (listen(m_server_socket, 5) == -1) {
+        close(m_server_socket);
+        throw std::runtime_error("Socket listen() failed");
+    }
+
     if (pthread_create(&thread, NULL, Worker::RunProxy, this) < 0) {
         throw std::runtime_error("Could not create worker thread");
     }
-    // TODO: implementation here
 }
 
 // See Worker.h
 void Worker::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-    // TODO: implementation here
     running = false;
 }
 
 // See Worker.h
 void Worker::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-    // TODO: implementation here
     pthread_join(thread, 0);
 }
 
@@ -166,7 +188,7 @@ void Worker::OnRun(int sfd) {
                 int done = 0;
 
                 while (1) {
-                    size_t count;
+                    ssize_t count;
                     char buf[4096];
 
                     count = read(events[i].data.fd, buf, sizeof buf);
@@ -184,10 +206,8 @@ void Worker::OnRun(int sfd) {
                         done = 1;
                         break;
                     }
-                    std::cout << "prev buf:" << bufers[events[i].data.fd] << "end of buf" << std::endl;
-                    std::cout << "recv: " << buf << std::endl << "end of rcv" << std::endl;
-                    bufers[events[i].data.fd] = ApplyFunc(bufers[events[i].data.fd] + buf, events[i].data.fd);
-                    //                    std::cout << bufers[events[i].data.fd];
+                    bufers[events[i].data.fd] =
+                        ApplyFunc(bufers[events[i].data.fd] + std::string(buf, count), events[i].data.fd);
                 }
 
                 if (done) {
@@ -201,17 +221,6 @@ void Worker::OnRun(int sfd) {
             }
         }
     }
-
-    // TODO: implementation here
-    // 1. Create epoll_context here
-    // 2. Add server_socket to context
-    // 3. Accept new connections, don't forget to call make_socket_nonblocking on
-    //    the client socket descriptor
-    // 4. Add connections to the local context
-    // 5. Process connection events
-    //
-    // Do not forget to use EPOLLEXCLUSIVE flag when register socket
-    // for events to avoid thundering herd type behavior.
 }
 
 std::string Worker::ApplyFunc(std::string buf_in, int sock) {
@@ -221,9 +230,9 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
         size_t first_symbol = buf.find_first_not_of("\n\r");
         if (first_symbol != std::string::npos)
             buf = buf.substr(first_symbol, buf.size() - first_symbol);
+        else
+            buf = "";
     };
-
-    //    std::cout << buf << std::endl;
 
     while (buf.size()) {
 
@@ -257,7 +266,7 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
 
         cut_buf(buf);
 
-        if (buf.size() < body_size + parsed) {
+        if (buf.size() < body_size) {
             return prev;
         }
 

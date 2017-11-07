@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <afina/Storage.h>
+#include <vector>
 
 #include "Utils.h"
 #include "Worker.h"

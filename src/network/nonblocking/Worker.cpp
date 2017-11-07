@@ -41,7 +41,7 @@ void *Worker::RunProxy(void *p) {
 }
 
 // See Worker.h
-Worker::Worker(std::shared_ptr<Afina::Storage> ps) : storage(ps) {
+Worker::Worker(std::shared_ptr<Afina::Storage> ps) :  running (false), storage(ps) {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
 }
 
@@ -89,7 +89,7 @@ void Worker::Start(sockaddr_in &server_addr) {
 // See Worker.h
 void Worker::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-    running = false;
+    running.store(false);
 }
 
 // See Worker.h
@@ -121,10 +121,10 @@ void Worker::OnRun(int sfd) {
         abort();
     }
 
-    while (1) {
+    while (running.load ()) {
         int n, i;
 
-        n = epoll_wait(efd, events, MAXEVENTS, -1);
+        n = epoll_wait(efd, events, MAXEVENTS, 10);
         for (i = 0; i < n; i++) {
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) {
                 /* An error has occured on this fd, or the socket is not

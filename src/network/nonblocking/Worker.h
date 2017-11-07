@@ -26,6 +26,11 @@ namespace NonBlocking {
 class Worker {
 public:
     Worker(std::shared_ptr<Afina::Storage> ps);
+
+    Worker(const Worker&) = delete;
+    Worker& operator=(const Worker&) = delete;
+    Worker& operator=(const Worker&) volatile = delete;
+
     ~Worker();
 
     /**
@@ -63,8 +68,8 @@ protected:
 private:
     pthread_t thread;
 
-    bool running = true;
-//    std::atomic<bool> __running;
+//    bool running;
+    std::atomic<bool> running;
 
     std::shared_ptr<Afina::Storage> storage;
     int m_server_socket;

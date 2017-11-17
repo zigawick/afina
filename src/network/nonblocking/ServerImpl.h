@@ -23,7 +23,7 @@ public:
     ~ServerImpl();
 
     // See Server.h
-    void Start(uint32_t port, uint16_t workers) override;
+    void Start(uint32_t port, uint16_t workers, int fifo, int out_fifo, std::string fifo_name) override;
 
     // See Server.h
     void Stop() override;
@@ -39,6 +39,9 @@ private:
 
     // Thread that is accepting new connections
     std::deque<Worker> workers;
+
+    int m_fifo;
+    int m_fifo_out;
 };
 
 } // namespace NonBlocking

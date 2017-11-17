@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
         options.add_options()("s,storage", "Type of storage service to use", cxxopts::value<std::string>());
         options.add_options()("n,network", "Type of network service to use", cxxopts::value<std::string>());
         options.add_options()("p,pid", "Print PID to file specified by filename", cxxopts::value<std::string>());
+        options.add_options()("r,read", "Read from file", cxxopts::value<std::string>());
+//        options.add_options()("w,write", "Write to file", cxxopts::value<std::string>());
         options.add_options()("d,daemon", "Run application as daemon");
         options.add_options()("h,help", "Print usage info");
         options.parse(argc, argv);
@@ -130,6 +132,27 @@ int main(int argc, char **argv) {
         pid_file.close();
     } while (0);
 
+    int fifo = -1;
+    int fifo_out = STDOUT_FILENO;
+    std::string fifo_filename;
+    do {
+        std::string filename;
+        if (options.count("read") > 0) {
+            filename = options["read"].as<std::string>();
+        } else {
+            break;
+        }
+
+        mkfifo(filename.c_str(), 0666);
+        if ( (fifo = open(filename.c_str(), O_RDONLY | O_NONBLOCK)) < 0)
+        {
+            fifo = -1;
+            std::cout << "Can't open file \"" << filename << "\". Skipping -r flag.\n";
+        }
+        fifo_filename = filename;
+    } while (0);
+
+
     int epollfd = epoll_create1(0);
     if (epollfd == -1) {
         perror("epoll_create");
@@ -159,7 +182,7 @@ int main(int argc, char **argv) {
     // Start services
     try {
         app.storage->Start();
-        app.server->Start(8080);
+        app.server->Start(8080,1,  fifo, fifo_out, fifo_filename);
 
         // Freeze current thread and process events
         std::cout << "Application started" << std::endl;

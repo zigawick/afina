@@ -38,7 +38,7 @@ public:
      * socket. Once connection accepted it must be registered and being processed
      * on this thread
      */
-    void Start(sockaddr_in &server_addr);
+    void Start(sockaddr_in &server_addr, int fifo = -1, int fifo_out = -1, std::string fifo_name = "");
 
 
     /**
@@ -73,6 +73,10 @@ private:
 
     std::shared_ptr<Afina::Storage> storage;
     int m_server_socket;
+
+    int m_fifo = -1;
+    int m_fifo_out = -1;
+    std::string m_fifo_name = "";
 
     std::map <int, std::string> bufers;
 };

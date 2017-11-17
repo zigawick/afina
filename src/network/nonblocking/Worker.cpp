@@ -24,6 +24,9 @@
 
 #include "Utils.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #define MAXEVENTS 10
 
 namespace Afina {
@@ -41,7 +44,7 @@ void *Worker::RunProxy(void *p) {
 }
 
 // See Worker.h
-Worker::Worker(std::shared_ptr<Afina::Storage> ps) :  running (false), storage(ps) {
+Worker::Worker(std::shared_ptr<Afina::Storage> ps) : running(false), storage(ps) {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
 }
 
@@ -49,9 +52,14 @@ Worker::Worker(std::shared_ptr<Afina::Storage> ps) :  running (false), storage(p
 Worker::~Worker() {}
 
 // See Worker.h
-void Worker::Start(sockaddr_in &server_addr) {
+void Worker::Start(sockaddr_in &server_addr, int fifo, int fifo_out, std::string fifo_name) {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-    running = true;
+    running.store(true);
+
+    m_fifo = fifo;
+    m_fifo_out = fifo_out;
+    m_fifo_name = fifo_name;
+
     m_server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (m_server_socket == -1) {
         throw std::runtime_error("Failed to open socket");
@@ -121,12 +129,22 @@ void Worker::OnRun(int sfd) {
         abort();
     }
 
-    while (running.load ()) {
+    if (m_fifo >= 0) {
+        event.data.fd = m_fifo;
+        event.events = EPOLLIN | EPOLLET;
+        s = epoll_ctl(efd, EPOLL_CTL_ADD, m_fifo, &event);
+        if (s == -1) {
+            perror("epoll_ctl");
+            abort();
+        }
+    }
+
+    while (running.load()) {
         int n, i;
 
         n = epoll_wait(efd, events, MAXEVENTS, 10);
         for (i = 0; i < n; i++) {
-            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) {
+            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP && events[i].data.fd != m_fifo) || (!(events[i].events & EPOLLIN))) {
                 /* An error has occured on this fd, or the socket is not
                          ready for reading (why were we notified then?) */
                 fprintf(stderr, "epoll error\n");
@@ -192,10 +210,35 @@ void Worker::OnRun(int sfd) {
                     char buf[4096];
 
                     count = read(events[i].data.fd, buf, sizeof buf);
+
                     if (count == -1) {
                         /* If errno == EAGAIN, that means we have read all
                                  data. So go back to the main loop. */
-                        if (errno != EAGAIN) {
+
+                        if (events[i].data.fd == m_fifo)
+                        {
+                            close (m_fifo);
+
+                            mkfifo(m_fifo_name.c_str(), 0666);
+                            if ((m_fifo = open(m_fifo_name.c_str(), O_RDONLY | O_NONBLOCK)) < 0)
+                            {
+                                done = 1;
+                                break;
+                            }
+
+                            if (m_fifo >= 0) {
+                                event.data.fd = m_fifo;
+                                event.events = EPOLLIN | EPOLLET;
+                                s = epoll_ctl(efd, EPOLL_CTL_ADD, m_fifo, &event);
+                                if (s == -1) {
+                                    perror("epoll_ctl");
+                                    abort();
+                                }
+                            }
+                            std::cout<<"reopend fifo"<<std::endl;
+
+                        }
+                        else if (errno != EAGAIN) {
                             perror("read");
                             done = 1;
                         }
@@ -251,6 +294,11 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
             if (send(sock, error.data(), error.size(), 0) <= 0) {
                 close(sock);
             }
+            if (m_fifo_out >= 0) {
+                if (send(m_fifo_out, error.data(), error.size(), 0) <= 0) {
+                    return "";
+                }
+            }
             return "";
         }
 
@@ -278,10 +326,20 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
                 close(sock);
                 return "";
             }
+            if (m_fifo_out >= 0) {
+                if (send(m_fifo_out, out.data(), out.size(), 0) <= 0) {
+                    return "";
+                }
+            }
         } catch (std::runtime_error &ex) {
             std::string error = std::string("SERVER_ERROR ") + ex.what() + "\n";
             if (send(sock, error.data(), error.size(), 0) <= 0) {
                 close(sock);
+            }
+            if (m_fifo_out >= 0) {
+                if (send(m_fifo_out, error.data(), error.size(), 0) <= 0) {
+                    return "";
+                }
             }
             return "";
         }

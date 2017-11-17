@@ -45,7 +45,7 @@ ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : Server(ps) {}
 ServerImpl::~ServerImpl() {}
 
 // See Server.h
-void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
+void ServerImpl::Start(uint32_t port, uint16_t n_workers, int fifo, int out_fifo, std::string fifo_name) {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
 
     // If a client closes a connection, this will generally produce a SIGPIPE
@@ -65,11 +65,16 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
     server_addr.sin_port = htons(port);       // TCP port number
     server_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
 
+    m_fifo = fifo;
+    m_fifo_out = out_fifo;
 
 
     for (int i = 0; i < n_workers; i++) {
         workers.emplace_back(pStorage);
-        workers.back().Start(server_addr);
+        if (i == 0)
+            workers.back().Start(server_addr, m_fifo, m_fifo_out, fifo_name);
+        else
+            workers.back().Start(server_addr);
     }
 }
 

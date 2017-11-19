@@ -17,7 +17,9 @@
 #include "network/blocking/ServerImpl.h"
 #include "network/nonblocking/ServerImpl.h"
 #include "network/uv/ServerImpl.h"
-#include "storage/MapBasedGlobalLockImpl.h"
+#include "storage/GlobalLock/MapBasedGlobalLockImpl.h"
+#include "storage/SharedLock/MapBasedSharedMutexImpl.h"
+#include "storage/Striped/MapBasedStripedImpl.h"
 
 typedef struct {
     std::shared_ptr<Afina::Storage> storage;
@@ -47,7 +49,7 @@ int main(int argc, char **argv) {
         options.add_options()("n,network", "Type of network service to use", cxxopts::value<std::string>());
         options.add_options()("p,pid", "Print PID to file specified by filename", cxxopts::value<std::string>());
         options.add_options()("r,read", "Read from file", cxxopts::value<std::string>());
-//        options.add_options()("w,write", "Write to file", cxxopts::value<std::string>());
+        //        options.add_options()("w,write", "Write to file", cxxopts::value<std::string>());
         options.add_options()("d,daemon", "Run application as daemon");
         options.add_options()("h,help", "Print usage info");
         options.parse(argc, argv);
@@ -73,6 +75,10 @@ int main(int argc, char **argv) {
 
     if (storage_type == "map_global") {
         app.storage = std::make_shared<Afina::Backend::MapBasedGlobalLockImpl>();
+    } else if (storage_type == "map_shared") {
+        app.storage = std::make_shared<Afina::Backend::MapBasedSharedMutexImpl>();
+    } else if (storage_type == "map_striped") {
+        app.storage = std::make_shared<Afina::Backend::MapBasedStripedImpl>();
     } else {
         throw std::runtime_error("Unknown storage type");
     }
@@ -144,14 +150,12 @@ int main(int argc, char **argv) {
         }
 
         mkfifo(filename.c_str(), 0666);
-        if ( (fifo = open(filename.c_str(), O_RDONLY | O_NONBLOCK)) < 0)
-        {
+        if ((fifo = open(filename.c_str(), O_RDONLY | O_NONBLOCK)) < 0) {
             fifo = -1;
             std::cout << "Can't open file \"" << filename << "\". Skipping -r flag.\n";
         }
         fifo_filename = filename;
     } while (0);
-
 
     int epollfd = epoll_create1(0);
     if (epollfd == -1) {
@@ -163,7 +167,6 @@ int main(int argc, char **argv) {
         printf("\ncan't catch SIGINT\n");
     if (signal(SIGTERM, sig_handler) == SIG_ERR)
         printf("\ncan't catch SIGTERM\n");
-
 
     sigset_t mask;
     sigemptyset(&mask);
@@ -182,7 +185,7 @@ int main(int argc, char **argv) {
     // Start services
     try {
         app.storage->Start();
-        app.server->Start(8080,1,  fifo, fifo_out, fifo_filename);
+        app.server->Start(8080, 1, fifo, fifo_out, fifo_filename);
 
         // Freeze current thread and process events
         std::cout << "Application started" << std::endl;

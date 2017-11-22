@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
     } while (0);
 
     int fifo = -1;
-    int fifo_out = STDOUT_FILENO;
+    int fifo_out = -1;//STDOUT_FILENO;
     std::string fifo_filename;
     do {
         std::string filename;

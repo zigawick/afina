@@ -2,6 +2,7 @@
 set(SOURCE_FILES
     GlobalLock/MapBasedGlobalLockImpl.cpp
     SharedLock/MapBasedSharedMutexImpl.cpp
+    SharedLock/shared_mutex.cpp
     Striped/MapBasedStripedImpl.cpp
 
 )

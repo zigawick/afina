@@ -277,6 +277,8 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
             buf = "";
     };
 
+    std::cout<<"lol here:"<<buf_in<<std::endl;
+
     while (buf.size()) {
 
         Protocol::Parser pr;
@@ -290,6 +292,8 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
         try {
             was_parsed = pr.Parse(buf, parsed);
         } catch (std::runtime_error &ex) {
+            std::cout<<"here_1"<<std::endl;
+
             std::string error = std::string("SERVER_ERROR ") + ex.what() + "\n";
             if (send(sock, error.data(), error.size(), 0) <= 0) {
                 close(sock);
@@ -301,10 +305,13 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
             }
             return "";
         }
+//        std::cout<<"here_2"<<std::endl;
+
 
         if (!was_parsed) {
             return buf;
         }
+
 
         uint32_t body_size = 0;
         std::unique_ptr<Execute::Command> command = pr.Build(body_size);
@@ -318,6 +325,8 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
             return prev;
         }
 
+
+
         std::string out;
         try {
             command->Execute(*storage, buf.substr(0, body_size), out);
@@ -326,12 +335,14 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
                 close(sock);
                 return "";
             }
+            std::cout<<"fifo:"<<m_fifo_out<<std::endl;
             if (m_fifo_out >= 0) {
                 if (send(m_fifo_out, out.data(), out.size(), 0) <= 0) {
                     return "";
                 }
             }
         } catch (std::runtime_error &ex) {
+            std::cout<<"here_1"<<std::endl;
             std::string error = std::string("SERVER_ERROR ") + ex.what() + "\n";
             if (send(sock, error.data(), error.size(), 0) <= 0) {
                 close(sock);
@@ -344,9 +355,12 @@ std::string Worker::ApplyFunc(std::string buf_in, int sock) {
             return "";
         }
 
+
+
         buf = buf.substr(body_size, buf.size() - body_size);
 
         cut_buf(buf);
+        std::cout<<"buf:"<<buf<<std::endl;
     }
 
     return buf;

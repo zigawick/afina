@@ -2,6 +2,7 @@
 #include <algorithm>
 
 #include <mutex>
+#include <shared_mutex>
 
 namespace Afina {
 namespace Backend {
@@ -19,7 +20,7 @@ struct writer_num {
 bool MapBasedSharedMutexImpl::Put(const std::string &key, const std::string &value) {
     {
         writer_num num(write_num);
-        std::unique_lock<std::shared_mutex> lock(mutex_);
+        std::unique_lock<shared_mutex> lock(mutex_);
         auto old_it = _backend.find(key);
 
         if (old_it != _backend.end()) {
@@ -38,7 +39,7 @@ bool MapBasedSharedMutexImpl::Put(const std::string &key, const std::string &val
 
 bool MapBasedSharedMutexImpl::PutIfAbsent(const std::string &key, const std::string &value) {
     writer_num num(write_num);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<shared_mutex> lock(mutex_);
     if (_max_size <= _backend.size()) {
         auto it = _cache.back();
         _backend.erase(it);
@@ -53,7 +54,7 @@ bool MapBasedSharedMutexImpl::PutIfAbsent(const std::string &key, const std::str
 
 bool MapBasedSharedMutexImpl::Set(const std::string &key, const std::string &value) {
     writer_num num(write_num);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<shared_mutex> lock(mutex_);
     auto it = _backend.find(key);
 
     if (it == _backend.end())
@@ -68,7 +69,7 @@ bool MapBasedSharedMutexImpl::Set(const std::string &key, const std::string &val
 
 bool MapBasedSharedMutexImpl::Delete(const std::string &key) {
     writer_num num(write_num);
-    std::unique_lock<std::shared_mutex> lock(mutex_);
+    std::unique_lock<shared_mutex> lock(mutex_);
     auto it = _backend.find(key);
 
     if (it == _backend.end())
@@ -85,7 +86,7 @@ bool MapBasedSharedMutexImpl::Delete(const std::string &key) {
 
 bool MapBasedSharedMutexImpl::Get(const std::string &key, std::string &value) const {
 
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    std::shared_lock<shared_mutex> lock(mutex_);
     cv.wait(lock, [this] { return write_num == 0; });
     auto it = _backend.find(key);
 

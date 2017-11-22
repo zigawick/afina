@@ -5,7 +5,7 @@
 #include <map>
 #include <mutex>
 #include <string>
-#include <shared_mutex>
+#include "shared_mutex.h"
 #include <atomic>
 
 #include <afina/Storage.h>
@@ -41,7 +41,7 @@ public:
 private:
     bool update_usage(std::map<std::string, std::string>::iterator it);
 
-    mutable std::shared_mutex mutex_;
+    mutable shared_mutex mutex_;
     mutable std::atomic_int write_num;
     mutable std::condition_variable_any cv;
 

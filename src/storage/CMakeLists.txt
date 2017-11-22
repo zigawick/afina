@@ -1,7 +1,9 @@
 # build service
 set(SOURCE_FILES
     GlobalLock/MapBasedGlobalLockImpl.cpp
-    SharedMutex/MapBasedSharedMutexImpl.cpp
+    SharedLock/MapBasedSharedMutexImpl.cpp
+    Striped/MapBasedStripedImpl.cpp
+
 )
 
 add_library(Storage ${SOURCE_FILES})

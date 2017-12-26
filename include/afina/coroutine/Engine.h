@@ -29,7 +29,7 @@ private:
         char *Hight = nullptr;
 
         // coroutine stack copy buffer
-        std::tuple<char *, uint32_t> Stack = std::make_tuple(nullptr, 0);
+        std::pair<char *, size_t> Stack = {nullptr, 0};
 
         // Saved coroutine context (registers)
         jmp_buf Environment;
@@ -76,7 +76,7 @@ protected:
     /**
      * Restore stack of the given context and pass control to coroutinne
      */
-    void Restore(context &ctx);
+    [[noreturn]] void Restore(context &ctx);
 
     /**
      * Suspend current coroutine execution and execute given context
